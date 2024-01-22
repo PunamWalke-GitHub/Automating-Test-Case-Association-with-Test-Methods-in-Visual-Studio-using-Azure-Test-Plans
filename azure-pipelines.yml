@@ -1,7 +1,3 @@
-# ASP.NET
-# Build and test ASP.NET projects.
-# Add steps that publish symbols, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/apps/aspnet/build-aspnet-4
 
 trigger:
 - master
@@ -14,28 +10,143 @@ variables:
   buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
 
-steps:
-- task: NuGetToolInstaller@0
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: 'windows-2019' 
+    steps:
+    - task: NuGetToolInstaller@0
 
-- task: NuGetCommand@2
-  inputs:
-    restoreSolution: '$(solution)'
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: '$(solution)'
 
-- task: VSBuild@1
-  inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+    - task: VSBuild@1
+      inputs:
+        solution: '$(solution)'
+        msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"'
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
 
-- task: CopyFiles@2
-  displayName: 'Copy Files'
-  inputs:
-    SourceFolder: '$(build.sourcesdirectory)'
-    Contents: '**/*.json'
-    TargetFolder: '$(build.artifactstagingdirectory)'
+    - task: CopyFiles@2
+      displayName: 'Copy Files'
+      inputs:
+        SourceFolder: '$(build.sourcesdirectory)'
+        Contents: '**/*.json'
+        TargetFolder: '$(build.artifactstagingdirectory)'
 
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact'
-  inputs:
-    PathtoPublish: '$(build.artifactstagingdirectory)'
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact'
+      inputs:
+        PathtoPublish: '$(build.artifactstagingdirectory)'
+
+- stage: Dev
+  dependsOn: Build
+  displayName: Deploy to Dev
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy to Dev
+    pool:
+      vmImage: 'windows-2019' 
+    environment: 'Dev'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(build.artifactstagingdirectory)'
+          
+
+          # ARM template deployment task
+          - task: AzureResourceGroupDeployment@2
+            inputs:
+              azureSubscription: 'Visual Studio Enterprise'
+              action: 'Create Or Update Resource Group'
+              resourceGroupName: '$(ResourceGroupName)'
+              location: 'Central India'
+              templateLocation: 'Linked artifact'
+              csmFile: '$(build.artifactstagingdirectory)/**/drop/PartsUnlimited-aspnet45/env/PartsUnlimitedEnv/Templates/FullEnvironmentSetupMerged.json'
+              csmParametersFile: '$(build.artifactstagingdirectory)/**/drop/PartsUnlimited-aspnet45/env/PartsUnlimitedEnv/Templates/FullEnvironmentSetupMerged.param.json'
+              overrideParameters: '-WebsiteName $(WebsiteName) -PUL_ServerName $(ServerName)  -PUL_HostingPlanName $(HostingPlan)'
+              deploymentMode: 'Incremental'
+
+          # Azure App Service Deploy task - deploy to slot 'Dev'
+          - task: AzureRmWebAppDeployment@3
+            displayName: 'Azure App Service Deploy'
+            inputs:
+              azureSubscription: 'Visual Studio Enterprise'
+              WebAppName: '$(WebsiteName)'
+              DeployToSlotFlag: true
+              ResourceGroupName: '$(ResourceGroupName)'
+              SlotName: Dev
+              Package: '$(build.artifactstagingdirectory)/**/PartsUnlimitedWebsite.zip'
+
+- stage: Stage
+  dependsOn: Dev
+  displayName: Deploy to Staging
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy to Staging
+    pool:
+      vmImage: 'windows-2019' 
+    environment: 'Staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(build.artifactstagingdirectory)'
+
+          # Azure App Service Deploy task - deploy to slot 'staging'
+          - task: AzureRmWebAppDeployment@3
+            displayName: 'Azure App Service Deploy'
+            inputs:
+              azureSubscription: 'Visual Studio Enterprise'
+              WebAppName: '$(WebsiteName)'
+              DeployToSlotFlag: true
+              ResourceGroupName: '$(ResourceGroupName)'
+              SlotName: staging
+              Package: '$(build.artifactstagingdirectory)/**/PartsUnlimitedWebsite.zip'
+
+
+- stage: Production
+  dependsOn: Stage
+  displayName: Deploy to Production
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy to Production
+    pool:
+      vmImage: 'windows-2019' 
+    environment: 'Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(build.artifactstagingdirectory)'
+
+          # Azure App Service Deploy task - deploy to production
+          - task: AzureRmWebAppDeployment@3
+            displayName: 'Azure App Service Deploy'
+            inputs:
+              azureSubscription: 'Visual Studio Enterprise'
+              WebAppName: '$(WebsiteName)'
+              Package: '$(build.artifactstagingdirectory)/**/PartsUnlimitedWebsite.zip'
+          
+          
