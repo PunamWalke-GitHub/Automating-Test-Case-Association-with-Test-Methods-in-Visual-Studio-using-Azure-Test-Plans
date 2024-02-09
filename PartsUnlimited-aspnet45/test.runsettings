@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+	<RunConfiguration>
+		<!-- Customize settings here -->
+		<MaxCpuCount>4</MaxCpuCount>
+		<!-- Add other configuration options as needed -->
+	</RunConfiguration>
+</RunSettings>
