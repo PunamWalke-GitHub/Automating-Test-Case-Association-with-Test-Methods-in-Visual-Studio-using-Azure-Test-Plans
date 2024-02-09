@@ -13,11 +13,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PartsUnlimited.UnitTests", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FabrikamFiber.SeleniumTests", "test\FabrikamFiber.SeleniumTests\FabrikamFiber.SeleniumTests.csproj", "{8BA1E3A6-DD40-4534-B987-712B6A6E1D02}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UTest", "UTest", "{2000C986-42F2-45D8-896C-DA9AEC04A270}"
-	ProjectSection(SolutionItems) = preProject
-		test.runsettings = test.runsettings
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
